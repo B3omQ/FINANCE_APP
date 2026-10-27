@@ -15,14 +15,15 @@ Theo dõi trạng thái hoàn thành từng Phase dựa theo `FINANCE_APP_SPEC.m
   - [x] Tạo `docs/DECISIONS.md`, `docs/PROGRESS.md`
   - [x] Kiểm tra lint, typecheck, test
 
-- [ ] **Phase 1: Lõi dữ liệu và nghiệp vụ**
-  - [ ] `domain/types.ts`
-  - [ ] `shared/lib/` (`formatMoney`, `parseAmount`, `date`, `uuid`) + unit tests
-  - [ ] `domain/` pure logic (`balance.ts`, `budget.ts`, `report.ts`, `recurring.ts`) + unit tests
-  - [ ] Migration `001_init.sql`, client DB
-  - [ ] Repository: bản `memory/` và bản `sqlite/`
-  - [ ] Seed dữ liệu ban đầu (danh mục mặc định, ví tiền mặt)
-  - [ ] Shared test suite cho repository
+- [x] **Phase 1: Lõi dữ liệu và nghiệp vụ**
+  - [x] `domain/types.ts` (định nghĩa chuẩn mục 5.1: BaseEntity, Account, Category, Transaction, Budget, RecurringRule, Goal)
+  - [x] `shared/lib/` (`formatMoney`, `parseAmount`, `date`, `uuid`) + unit tests (độ phủ 93.6%)
+  - [x] `domain/` pure logic (`balance.ts`, `budget.ts`, `report.ts`, `recurring.ts`) + unit tests (độ phủ 96.6%)
+  - [x] Migration `001_init.sql`, đăng ký plugin SQLite trong Rust và `src-tauri/Cargo.toml`, capabilities, `db/client.ts`
+  - [x] Triển khai Repositories: cả bản `memory/` và bản `sqlite/`
+  - [x] Seed dữ liệu ban đầu (danh mục mặc định, ví tiền mặt, đánh dấu `app_settings` idempotent)
+  - [x] Bộ test dùng chung cho cả `memory/` và `sqlite/` đạt 100% (48 tests pass)
+  - [x] Kiểm tra bắt buộc: chuyển khoản không làm đổi tổng thu/chi; xóa mềm cặp transfer xóa cả hai dòng; số dư ví đúng sau chuỗi giao dịch; `parseAmount` đủ ca; `generateDue` đúng ca cuối tháng.
 
 - [ ] **Phase 2: Ví, danh mục, giao dịch (UI cốt lõi)**
   - [ ] App Layout (sidebar responsive, mobile tabs)
