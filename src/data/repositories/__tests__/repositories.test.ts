@@ -236,4 +236,166 @@ describe.each(implementations)("$name implementation suite", ({ name, init }) =>
     await repos.settings.set("theme", "light");
     expect(await repos.settings.get("theme")).toBe("light");
   });
+
+  it("PHASE 2: updating a transfer transaction keeps pair in sync and updates balances", async () => {
+    const acc1 = await repos.accounts.create({
+      name: "Ví Chuyển 1",
+      type: "bank",
+      initialBalance: 2_000_000,
+    });
+    const acc2 = await repos.accounts.create({
+      name: "Ví Nhận 2",
+      type: "cash",
+      initialBalance: 500_000,
+    });
+
+    const [fromTx, toTx] = await repos.transactions.createTransfer({
+      date: "2026-10-27",
+      amount: 400_000,
+      fromAccountId: acc1.id,
+      toAccountId: acc2.id,
+      note: "Chuyển ban đầu",
+    });
+
+    // Initial transfer check
+    let balances = await repos.accounts.balances();
+    expect(balances[acc1.id]).toBe(1_600_000);
+    expect(balances[acc2.id]).toBe(900_000);
+
+    // Update fromTx to amount: -600_000, note: "Chuyển sửa lại"
+    await repos.transactions.update(fromTx.id, {
+      amount: -600_000,
+      note: "Chuyển sửa lại",
+    });
+
+    const updatedFrom = await repos.transactions.get(fromTx.id);
+    const updatedTo = await repos.transactions.get(toTx.id);
+
+    expect(updatedFrom?.amount).toBe(-600_000);
+    expect(updatedFrom?.note).toBe("Chuyển sửa lại");
+    // Paired transaction must be updated to +600_000 and same note
+    expect(updatedTo?.amount).toBe(600_000);
+    expect(updatedTo?.note).toBe("Chuyển sửa lại");
+
+    balances = await repos.accounts.balances();
+    expect(balances[acc1.id]).toBe(1_400_000);
+    expect(balances[acc2.id]).toBe(1_100_000);
+  });
+
+  it("PHASE 2: category reordering by sortOrder works correctly", async () => {
+    const catA = await repos.categories.create({
+      name: "Danh mục A",
+      kind: "expense",
+      sortOrder: 10,
+    });
+    const catB = await repos.categories.create({
+      name: "Danh mục B",
+      kind: "expense",
+      sortOrder: 20,
+    });
+
+    let list = await repos.categories.list("expense");
+    const indexA = list.findIndex((c) => c.id === catA.id);
+    const indexB = list.findIndex((c) => c.id === catB.id);
+    expect(indexA).toBeLessThan(indexB);
+
+    // Swap sortOrder
+    await repos.categories.update(catA.id, { sortOrder: 30 });
+
+    list = await repos.categories.list("expense");
+    const newIndexA = list.findIndex((c) => c.id === catA.id);
+    const newIndexB = list.findIndex((c) => c.id === catB.id);
+    expect(newIndexB).toBeLessThan(newIndexA);
+  });
+
+  it("PHASE 2: filters transactions by search, type, date and account", async () => {
+    const acc = await repos.accounts.create({
+      name: "Ví Filter",
+      type: "cash",
+      initialBalance: 0,
+    });
+    const cat = (await repos.categories.list("expense"))[0]!;
+
+    await repos.transactions.create({
+      date: "2026-10-25",
+      amount: -50_000,
+      type: "expense",
+      accountId: acc.id,
+      categoryId: cat.id,
+      note: "Ăn trưa bún bò",
+    });
+
+    await repos.transactions.create({
+      date: "2026-10-26",
+      amount: -150_000,
+      type: "expense",
+      accountId: acc.id,
+      categoryId: cat.id,
+      note: "Mua sắm quần áo",
+    });
+
+    await repos.transactions.create({
+      date: "2026-10-27",
+      amount: 500_000,
+      type: "income",
+      accountId: acc.id,
+      note: "Tiền thưởng dự án",
+    });
+
+    // 1. Filter by search note
+    const searchRes = await repos.transactions.list({ search: "bún bò" });
+    expect(searchRes).toHaveLength(1);
+    expect(searchRes[0]?.note).toBe("Ăn trưa bún bò");
+
+    // 2. Filter by type
+    const typeRes = await repos.transactions.list({ type: "income", accountIds: [acc.id] });
+    expect(typeRes).toHaveLength(1);
+    expect(typeRes[0]?.amount).toBe(500_000);
+
+    // 3. Filter by date range
+    const dateRes = await repos.transactions.list({
+      dateFrom: "2026-10-26",
+      dateTo: "2026-10-27",
+      accountIds: [acc.id],
+    });
+    expect(dateRes).toHaveLength(2);
+  });
+});
+
+describe("LocalStorage Persistent Memory Store Suite", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("persists created transactions and accounts across repo instances", async () => {
+    // Instance 1: write data with persist: true
+    const repo1 = createMemoryRepositories({ seed: true, persist: true });
+    const acc = await repo1.accounts.create({
+      name: "Ví tiết kiệm",
+      type: "bank",
+      initialBalance: 2_000_000,
+    });
+    await repo1.transactions.create({
+      date: "2026-10-28",
+      amount: -150_000,
+      type: "expense",
+      accountId: acc.id,
+      note: "Mua sách lập trình",
+    });
+
+    // Verify localStorage has data
+    expect(localStorage.getItem("finance_app_store_v1")).not.toBeNull();
+
+    // Instance 2: new store instance simulating app reload
+    const repo2 = createMemoryRepositories({ seed: false, persist: true });
+    const accounts = await repo2.accounts.list();
+    const savedAcc = accounts.find((a) => a.id === acc.id);
+    expect(savedAcc).toBeDefined();
+    expect(savedAcc?.name).toBe("Ví tiết kiệm");
+
+    const txs = await repo2.transactions.list({ accountIds: [acc.id] });
+    expect(txs).toHaveLength(1);
+    expect(txs[0]?.note).toBe("Mua sách lập trình");
+    expect(txs[0]?.amount).toBe(-150_000);
+  });
 });

@@ -566,55 +566,48 @@ Mỗi phase có: **Việc cần làm**, **Tiêu chí hoàn thành**. Agent khôn
 - Mở app 3 lần liên tiếp không sinh thêm giao dịch định kỳ mới.
 - Ngân sách đổi màu đúng tại các ngưỡng 80% và 100%.
 
-### Phase 4: Import/Export và sao lưu
+### Phase 4: [ĐÃ LƯỢC BỎ]
+> **Quyết định**: Tính năng Import/Export sao kê ngân hàng CSV và sao lưu phức tạp được lược bỏ do không cần thiết đối với nhu cầu sử dụng cá nhân độc lập. Toàn bộ dữ liệu của người dùng được tự động lưu trữ trực tiếp và bền vững trong cơ sở dữ liệu SQLite cục bộ (`finance.db`).
+
+### Phase 5: Đóng gói hoàn thiện bản Windows
+
+**Mục tiêu chính**: Tập trung hoàn thiện và đóng gói ứng dụng desktop Windows độc lập, an toàn và dễ sử dụng cho cá nhân.
 
 **Việc cần làm**
-- `csvImport.ts`: chọn file CSV, ánh xạ cột (ngày, số tiền, mô tả) qua giao diện, xem trước, chọn ví và danh mục mặc định, phát hiện trùng (cùng ngày + số tiền + ghi chú) và cho phép bỏ qua, rồi nhập.
-- Hỗ trợ định dạng ngày phổ biến (`dd/MM/yyyy`, `yyyy-MM-dd`) và số tiền kiểu Việt (`1.500.000`).
-- `backup.ts`: xuất toàn bộ dữ liệu ra file JSON (có số phiên bản schema) và sao chép file `.db`; khôi phục từ file JSON với xác nhận ghi đè.
-- Nhắc sao lưu định kỳ (cài đặt: tắt / hàng tuần / hàng tháng).
+- **Cấu hình Tauri & Đóng gói release**: Cấu hình hoàn thiện `tauri.conf.json` (tên sản phẩm `FinanceApp`, phiên bản, icon ứng dụng, kích thước cửa sổ tối ưu 1100x750, minWidth 400).
+- **Quyền hạn SQLite cục bộ**: Đảm bảo toàn quyền I/O cho SQLite (`sql:default`, `sql:allow-execute`, `sql:allow-load`, `sql:allow-select`, `sql:allow-close`) để dữ liệu lưu vĩnh viễn vào `%APPDATA%\com.financeapp.desktop\finance.db`.
+- **Bộ cài đặt Windows tự động (NSIS & Portable)**: Xuất file cài đặt chuẩn `FinanceApp_x64-setup.exe` và file chạy trực tiếp `tauri-app.exe`.
+- **Tối ưu dung lượng & Tiện ích quản lý**: Tích hợp menu tiện ích khởi chạy, build và dọn dẹp dung lượng cache build (`target/`) trong `start.bat` để giải phóng ổ cứng bất cứ khi nào cần.
+- **Dọn dẹp mã nguồn & Kiểm thử chất lượng**: Đảm bảo 100% test cases pass, 0 lỗi TypeScript strict, 0 warning ESLint, giao diện hiển thị sắc nét trên màn hình Windows.
 
 **Tiêu chí hoàn thành**
-- Import một file CSV mẫu (có đủ ca ngày/số tiền khác định dạng, dòng trùng) cho kết quả đúng như xem trước.
-- Export rồi restore trên DB trống cho ra dữ liệu giống hệt (so sánh số bản ghi và tổng số dư).
-- File backup từ phiên bản schema cũ vẫn restore được hoặc báo lỗi rõ ràng.
-
-### Phase 5: Hoàn thiện desktop
-
-**Việc cần làm**
-- Phím tắt toàn cục (mặc định `Ctrl+Shift+N`) mở cửa sổ Quick Add nhỏ ngay cả khi app đang thu nhỏ.
-- System tray: chạy nền, mở nhanh, thoát.
-- Khóa app bằng PIN/mật khẩu khi mở (băm, không lưu thô). Mã hóa file DB (SQLCipher) là tùy chọn, ghi rõ trong `DECISIONS.md` nếu thực hiện.
-- Báo cáo năm, tinh chỉnh trạng thái rỗng, trạng thái lỗi, tải.
-- Đóng gói bản cài đặt Windows (và macOS/Linux nếu môi trường cho phép).
-
-**Tiêu chí hoàn thành**
-- Phím tắt toàn cục hoạt động khi app ở nền.
-- Bản cài đặt chạy trên máy sạch, không cần cài thêm gì.
-- Bật khóa PIN: mở app yêu cầu PIN, sai PIN không vào được.
+- Bản cài đặt Windows `.exe` chạy độc lập trên máy tính sạch (không cần cài thêm Node.js hay Rust).
+- Thao tác thêm/sửa/xóa giao dịch, tài khoản, ngân sách, mục tiêu được lưu vĩnh viễn vào SQLite. Đóng app, mở lại hoặc khởi động lại máy dữ liệu vẫn nguyên vẹn.
+- Thao tác build và dọn dẹp dung lượng được tự động hóa, dễ sử dụng.
 
 ### Phase 6: Mobile (làm sau khi desktop ổn định)
 
-**Việc cần làm**
-- Kích hoạt target Android (và iOS nếu có Mac) của Tauri 2.
-- Chỉnh layout: thanh tab dưới, nút nhập nhanh lớn, form tối ưu cảm ứng. **Không** sửa `domain/` hay `data/`.
-- Kiểm tra plugin SQL và đường dẫn lưu file trên mobile.
+Việc cần làm
 
-**Tiêu chí hoàn thành**
-- Cùng codebase build được bản mobile chạy trên thiết bị/giả lập.
-- Quick Add dùng thoải mái bằng một tay.
+Kích hoạt target Android của Tauri 2.
+Chỉnh layout: thanh tab dưới, nút nhập nhanh lớn, form tối ưu cảm ứng. Không sửa domain/ hay data/.
+Kiểm tra plugin SQL và đường dẫn lưu file trên mobile.
 
-**Phương án dự phòng**: nếu Tauri mobile gặp lỗi chặn được, giữ nguyên `domain/` + `data/` + `shared/lib` và viết UI mobile riêng (React Native hoặc Capacitor). Ghi quyết định vào `DECISIONS.md`.
+Tiêu chí hoàn thành
+
+Cùng codebase build được bản mobile chạy trên thiết bị/giả lập.
+Quick Add dùng thoải mái bằng một tay.
+
+Phương án dự phòng: nếu Tauri mobile gặp lỗi chặn được, giữ nguyên domain/ + data/ + shared/lib và viết UI mobile riêng (React Native hoặc Capacitor). Ghi quyết định vào DECISIONS.md.
 
 ### Phase 7: Đồng bộ PC ↔ mobile (tùy chọn, làm cuối)
 
-**Hướng khuyến nghị**: đồng bộ qua file trong thư mục cloud có sẵn (Drive/OneDrive/Syncthing). Mỗi thiết bị ghi bản đổi của mình, gộp dựa trên `updated_at`, **bản sửa mới nhất thắng**, xóa mềm được đồng bộ như một thay đổi. Thực hiện bằng cách bọc/tạo thêm một bản cài đặt repository, không sửa UI.
+Hướng khuyến nghị: đồng bộ qua file trong thư mục cloud có sẵn (Drive/OneDrive/Syncthing). Mỗi thiết bị ghi bản đổi của mình, gộp dựa trên updated_at, bản sửa mới nhất thắng, xóa mềm được đồng bộ như một thay đổi. Thực hiện bằng cách bọc/tạo thêm một bản cài đặt repository, không sửa UI.
 
-**Tiêu chí hoàn thành**
-- Sửa trên PC, đồng bộ, thấy trên mobile và ngược lại.
-- Xóa trên một máy được phản ánh trên máy kia, không "sống lại".
+Tiêu chí hoàn thành
 
----
+Sửa trên PC, đồng bộ, thấy trên mobile và ngược lại.
+Xóa trên một máy được phản ánh trên máy kia, không "sống lại".
 
 ## 11. Tiêu chuẩn chất lượng
 

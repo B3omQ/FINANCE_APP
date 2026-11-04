@@ -32,6 +32,8 @@ import type {
   TransactionRepository,
 } from "../types";
 
+const STORAGE_KEY = "finance_app_store_v1";
+
 export class MemoryStore {
   accounts: Map<ID, Account> = new Map();
   categories: Map<ID, Category> = new Map();
@@ -40,6 +42,64 @@ export class MemoryStore {
   recurringRules: Map<ID, RecurringRule> = new Map();
   goals: Map<ID, Goal> = new Map();
   settings: Map<string, string> = new Map();
+  private persist: boolean;
+
+  constructor(persist = false) {
+    this.persist = persist;
+    if (this.persist) {
+      this.load();
+    }
+  }
+
+  load(): void {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.accounts)) {
+        this.accounts = new Map(data.accounts.map((a: Account) => [a.id, a]));
+      }
+      if (Array.isArray(data.categories)) {
+        this.categories = new Map(data.categories.map((c: Category) => [c.id, c]));
+      }
+      if (Array.isArray(data.transactions)) {
+        this.transactions = new Map(data.transactions.map((t: Transaction) => [t.id, t]));
+      }
+      if (Array.isArray(data.budgets)) {
+        this.budgets = new Map(data.budgets.map((b: Budget) => [b.id, b]));
+      }
+      if (Array.isArray(data.recurringRules)) {
+        this.recurringRules = new Map(data.recurringRules.map((r: RecurringRule) => [r.id, r]));
+      }
+      if (Array.isArray(data.goals)) {
+        this.goals = new Map(data.goals.map((g: Goal) => [g.id, g]));
+      }
+      if (Array.isArray(data.settings)) {
+        this.settings = new Map(data.settings);
+      }
+    } catch (e) {
+      console.warn("Failed to load store from localStorage:", e);
+    }
+  }
+
+  save(): void {
+    if (!this.persist || typeof window === "undefined" || !window.localStorage) return;
+    try {
+      const payload = {
+        accounts: Array.from(this.accounts.values()),
+        categories: Array.from(this.categories.values()),
+        transactions: Array.from(this.transactions.values()),
+        budgets: Array.from(this.budgets.values()),
+        recurringRules: Array.from(this.recurringRules.values()),
+        goals: Array.from(this.goals.values()),
+        settings: Array.from(this.settings.entries()),
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Failed to save store to localStorage:", e);
+    }
+  }
 
   seed() {
     if (this.settings.get("seeded") === "1") {
@@ -81,6 +141,7 @@ export class MemoryStore {
     }
 
     this.settings.set("seeded", "1");
+    this.save();
   }
 }
 
@@ -156,6 +217,7 @@ export class MemoryTransactionRepository implements TransactionRepository {
     };
 
     this.store.transactions.set(id, tx);
+    this.store.save();
     return { ...tx };
   }
 
@@ -196,6 +258,7 @@ export class MemoryTransactionRepository implements TransactionRepository {
 
     this.store.transactions.set(fromTx.id, fromTx);
     this.store.transactions.set(toTx.id, toTx);
+    this.store.save();
 
     return [{ ...fromTx }, { ...toTx }];
   }
@@ -219,6 +282,27 @@ export class MemoryTransactionRepository implements TransactionRepository {
     };
 
     this.store.transactions.set(id, updated);
+
+    // If part of a transfer group, keep the paired transaction in sync (amount with opposite sign, date, note)
+    if (existing.transferGroupId) {
+      for (const [otherId, other] of this.store.transactions.entries()) {
+        if (
+          other.transferGroupId === existing.transferGroupId &&
+          otherId !== id &&
+          other.deletedAt === null
+        ) {
+          this.store.transactions.set(otherId, {
+            ...other,
+            amount: patch.amount !== undefined ? -patch.amount : other.amount,
+            date: patch.date !== undefined ? patch.date : other.date,
+            note: patch.note !== undefined ? patch.note : other.note,
+            updatedAt: nowISO(),
+          });
+        }
+      }
+    }
+
+    this.store.save();
     return { ...updated };
   }
 
@@ -246,6 +330,7 @@ export class MemoryTransactionRepository implements TransactionRepository {
         updatedAt: now,
       });
     }
+    this.store.save();
   }
 
   async restore(id: ID): Promise<void> {
@@ -271,6 +356,7 @@ export class MemoryTransactionRepository implements TransactionRepository {
         updatedAt: now,
       });
     }
+    this.store.save();
   }
 }
 
@@ -311,6 +397,7 @@ export class MemoryAccountRepository implements AccountRepository {
     };
 
     this.store.accounts.set(id, acc);
+    this.store.save();
     return { ...acc };
   }
 
@@ -327,6 +414,7 @@ export class MemoryAccountRepository implements AccountRepository {
     };
 
     this.store.accounts.set(id, updated);
+    this.store.save();
     return { ...updated };
   }
 
@@ -339,6 +427,7 @@ export class MemoryAccountRepository implements AccountRepository {
       deletedAt: nowISO(),
       updatedAt: nowISO(),
     });
+    this.store.save();
   }
 
   async balances(): Promise<Record<ID, Money>> {
@@ -390,6 +479,7 @@ export class MemoryCategoryRepository implements CategoryRepository {
     };
 
     this.store.categories.set(id, cat);
+    this.store.save();
     return { ...cat };
   }
 
@@ -406,6 +496,7 @@ export class MemoryCategoryRepository implements CategoryRepository {
     };
 
     this.store.categories.set(id, updated);
+    this.store.save();
     return { ...updated };
   }
 
@@ -418,6 +509,7 @@ export class MemoryCategoryRepository implements CategoryRepository {
       deletedAt: nowISO(),
       updatedAt: nowISO(),
     });
+    this.store.save();
   }
 }
 
@@ -444,6 +536,7 @@ export class MemoryBudgetRepository implements BudgetRepository {
         updatedAt: now,
       };
       this.store.budgets.set(existing.id, updated);
+      this.store.save();
       return { ...updated };
     }
 
@@ -459,6 +552,7 @@ export class MemoryBudgetRepository implements BudgetRepository {
     };
 
     this.store.budgets.set(id, created);
+    this.store.save();
     return { ...created };
   }
 
@@ -478,6 +572,7 @@ export class MemoryBudgetRepository implements BudgetRepository {
       deletedAt: nowISO(),
       updatedAt: nowISO(),
     });
+    this.store.save();
   }
 }
 
@@ -515,13 +610,14 @@ export class MemoryRecurringRepository implements RecurringRepository {
       startDate: input.startDate,
       endDate: input.endDate ?? null,
       lastGeneratedDate: null,
-      active: true,
+      active: input.active !== undefined ? input.active : true,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
     };
 
     this.store.recurringRules.set(id, rule);
+    this.store.save();
     return { ...rule };
   }
 
@@ -538,6 +634,7 @@ export class MemoryRecurringRepository implements RecurringRepository {
     };
 
     this.store.recurringRules.set(id, updated);
+    this.store.save();
     return { ...updated };
   }
 
@@ -550,6 +647,7 @@ export class MemoryRecurringRepository implements RecurringRepository {
       deletedAt: nowISO(),
       updatedAt: nowISO(),
     });
+    this.store.save();
   }
 
   async markGenerated(id: ID, date: DateOnly): Promise<void> {
@@ -561,6 +659,7 @@ export class MemoryRecurringRepository implements RecurringRepository {
       lastGeneratedDate: date,
       updatedAt: nowISO(),
     });
+    this.store.save();
   }
 }
 
@@ -598,6 +697,7 @@ export class MemoryGoalRepository implements GoalRepository {
     };
 
     this.store.goals.set(id, goal);
+    this.store.save();
     return { ...goal };
   }
 
@@ -614,6 +714,7 @@ export class MemoryGoalRepository implements GoalRepository {
     };
 
     this.store.goals.set(id, updated);
+    this.store.save();
     return { ...updated };
   }
 
@@ -630,6 +731,7 @@ export class MemoryGoalRepository implements GoalRepository {
     };
 
     this.store.goals.set(id, updated);
+    this.store.save();
     return { ...updated };
   }
 
@@ -642,6 +744,7 @@ export class MemoryGoalRepository implements GoalRepository {
       deletedAt: nowISO(),
       updatedAt: nowISO(),
     });
+    this.store.save();
   }
 }
 
@@ -654,11 +757,12 @@ export class MemorySettingsRepository implements SettingsRepository {
 
   async set(key: string, value: string): Promise<void> {
     this.store.settings.set(key, value);
+    this.store.save();
   }
 }
 
-export function createMemoryRepositories(options?: { seed?: boolean }): Repositories {
-  const store = new MemoryStore();
+export function createMemoryRepositories(options?: { seed?: boolean; persist?: boolean }): Repositories {
+  const store = new MemoryStore(options?.persist ?? false);
   if (options?.seed !== false) {
     store.seed();
   }

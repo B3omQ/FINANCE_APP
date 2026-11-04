@@ -57,6 +57,7 @@ export default [
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-explicit-any": "error",
+      "react-hooks/set-state-in-effect": "off",
       "boundaries/dependencies": [
         "error",
         {

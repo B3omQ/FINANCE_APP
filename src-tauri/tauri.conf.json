@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "FinanceApp",
   "version": "0.1.0",
   "identifier": "com.financeapp.desktop",
   "build": {
@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-app",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "title": "Finance App",
+        "width": 1100,
+        "height": 750,
+        "minWidth": 400,
+        "minHeight": 500
       }
     ],
     "security": {

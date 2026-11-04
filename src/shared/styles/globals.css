@@ -4,65 +4,89 @@
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Obsidian & Emerald Fintech Theme (Dark by default) */
+    --background: 224 35% 6%;         /* #0a0d14 Deep Obsidian */
+    --foreground: 210 25% 98%;        /* Crisp cool white */
 
-    --card: 222.2 84% 6.5%;
-    --card-foreground: 210 40% 98%;
+    --card: 224 28% 9%;              /* #0f141f Elevated card surface */
+    --card-foreground: 210 25% 98%;
 
-    --popover: 222.2 84% 6.5%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 224 28% 9%;
+    --popover-foreground: 210 25% 98%;
 
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 158 75% 42%;           /* #17b876 Vivid Emerald */
+    --primary-foreground: 224 35% 6%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 22% 14%;         /* Dark slate accent */
+    --secondary-foreground: 210 25% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 20% 13%;
+    --muted-foreground: 218 16% 62%;  /* Readable muted gray */
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 158 45% 15%;
+    --accent-foreground: 158 75% 65%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 348 83% 60%;       /* Rose coral */
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --border: 220 20% 16%;
+    --input: 220 20% 16%;
+    --ring: 158 75% 42%;
 
-    --radius: 0.5rem;
+    --radius: 0.875rem;
   }
 
   .light {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 20% 98%;        /* Crisp light background */
+    --foreground: 224 35% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 35% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 224 35% 8%;
 
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 158 75% 38%;           /* Rich Forest Emerald */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 20% 93%;
+    --secondary-foreground: 224 35% 8%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 20% 93%;
+    --muted-foreground: 220 12% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 158 60% 92%;
+    --accent-foreground: 158 75% 25%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 348 83% 54%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 158 75% 38%;
+  }
+
+  .oled {
+    --background: 0 0% 0%;            /* Pure OLED #000000 */
+    --foreground: 210 25% 98%;
+
+    --card: 0 0% 4%;                  /* Deep black card */
+    --card-foreground: 210 25% 98%;
+
+    --popover: 0 0% 4%;
+    --popover-foreground: 210 25% 98%;
+
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 210 25% 98%;
+
+    --muted: 0 0% 7%;
+    --muted-foreground: 218 16% 65%;
+
+    --accent: 0 0% 12%;
+    --accent-foreground: 210 25% 98%;
+
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
   }
 }
 
@@ -72,13 +96,212 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     user-select: none;
     -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    background-image: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.06), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 90% 10%, rgba(59, 130, 246, 0.04), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  .oled body {
+    background-image: none !important;
+    background-color: #000000 !important;
+  }
+
+  /* When background image is present, add adaptive glassmorphism */
+  .has-bg-wallpaper .fin-card {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    background: hsl(var(--card) / var(--card-opacity, 0.75));
+    border-color: hsl(var(--border) / 0.5);
+  }
+
+  .has-bg-wallpaper aside {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background-color: hsl(var(--background) / 0.78) !important;
   }
 
   /* Financial numbers styling */
   .font-tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Sleek custom scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border) / 0.6);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--border));
+  }
+}
+
+@layer utilities {
+  /* Glass card with hairline border and subtle gradient sheen */
+  .fin-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), hsl(var(--card));
+    border: 1px solid hsl(var(--border) / 0.65);
+    border-radius: var(--radius);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .fin-card:hover {
+    border-color: hsl(var(--border));
+  }
+
+  /* Hero Net Stat Card with ambient subtle primary accent rim */
+  .fin-hero-card {
+    background: radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.14) 0%, transparent 60%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%),
+                hsl(var(--card));
+    border: 1px solid hsl(var(--primary) / 0.28);
+    box-shadow: 0 10px 30px -10px hsl(var(--primary) / 0.15);
+  }
+
+  /* Signature pill badge */
+  .fin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  /* Mobile Safe Area Insets (Android gesture pill & top camera cutouts) */
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+  }
+  .pt-safe {
+    padding-top: max(3.25rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+  }
+  .pt-safe-top {
+    padding-top: max(3.25rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+  }
+  .bottom-safe-fab {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* GPU-Accelerated Smooth Transitions for Tabs, Modals & HUD Notifications */
+  @keyframes modalSlideUp {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 32px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  @keyframes modalFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes backdropFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes pageFadeIn {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 6px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  @keyframes hudPopupIn {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 12px, 0) scale(0.92);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  @keyframes hudPopupOut {
+    0% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(0, 8px, 0) scale(0.92);
+    }
+  }
+
+  @keyframes backdropFadeOut {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .animate-modal-sheet {
+    animation: modalSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity;
+  }
+
+  .animate-modal-desktop {
+    animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity;
+  }
+
+  .animate-backdrop {
+    animation: backdropFadeIn 0.18s ease-out forwards;
+    will-change: opacity;
+  }
+
+  .animate-backdrop-out {
+    animation: backdropFadeOut 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: opacity;
+  }
+
+  .page-fade-in {
+    animation: pageFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity;
+  }
+
+  .animate-hud-popup {
+    animation: hudPopupIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity;
+  }
+
+  .animate-hud-popup-out {
+    animation: hudPopupOut 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity;
   }
 }

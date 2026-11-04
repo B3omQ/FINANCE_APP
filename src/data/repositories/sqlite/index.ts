@@ -352,6 +352,27 @@ export class SqliteTransactionRepository implements TransactionRepository {
       [date, amount, type, accountId, categoryId, note, now, id]
     );
 
+    // If part of a transfer group, keep the paired transaction in sync (amount with opposite sign, date, note)
+    if (existing.transferGroupId) {
+      const pairedRows = await this.db.select<TransactionRow[]>(
+        "SELECT * FROM transactions WHERE transfer_group_id = ? AND id != ? AND deleted_at IS NULL;",
+        [existing.transferGroupId, id]
+      );
+      const paired = pairedRows[0];
+      if (paired) {
+        const pairedAmount = patch.amount !== undefined ? -patch.amount : paired.amount;
+        const pairedDate = patch.date !== undefined ? patch.date : paired.date;
+        const pairedNote = patch.note !== undefined ? patch.note : paired.note;
+
+        await this.db.execute(
+          `UPDATE transactions
+           SET date = ?, amount = ?, note = ?, updated_at = ?
+           WHERE id = ?;`,
+          [pairedDate, pairedAmount, pairedNote, now, paired.id]
+        );
+      }
+    }
+
     const updated = await this.get(id);
     if (!updated) throw new Error("Failed to update transaction.");
     return updated;
@@ -678,10 +699,11 @@ export class SqliteRecurringRepository implements RecurringRepository {
   async create(input: NewRecurringRule): Promise<RecurringRule> {
     const id = generateId();
     const now = nowISO();
+    const active = input.active !== undefined ? (input.active ? 1 : 0) : 1;
 
     await this.db.execute(
       `INSERT INTO recurring_rules (id, name, type, amount, account_id, category_id, note, frequency, interval, start_date, end_date, last_generated_date, active, created_at, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, ?, ?, NULL);`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL);`,
       [
         id,
         input.name,
@@ -694,6 +716,7 @@ export class SqliteRecurringRepository implements RecurringRepository {
         input.interval ?? 1,
         input.startDate,
         input.endDate ?? null,
+        active,
         now,
         now,
       ]
@@ -719,12 +742,13 @@ export class SqliteRecurringRepository implements RecurringRepository {
     const interval = patch.interval !== undefined ? patch.interval : existing.interval;
     const startDate = patch.startDate ?? existing.startDate;
     const endDate = patch.endDate !== undefined ? patch.endDate : existing.endDate;
+    const active = patch.active !== undefined ? (patch.active ? 1 : 0) : (existing.active ? 1 : 0);
 
     await this.db.execute(
       `UPDATE recurring_rules
-       SET name = ?, type = ?, amount = ?, account_id = ?, category_id = ?, note = ?, frequency = ?, interval = ?, start_date = ?, end_date = ?, updated_at = ?
+       SET name = ?, type = ?, amount = ?, account_id = ?, category_id = ?, note = ?, frequency = ?, interval = ?, start_date = ?, end_date = ?, active = ?, updated_at = ?
        WHERE id = ?;`,
-      [name, type, amount, accountId, categoryId, note, frequency, interval, startDate, endDate, now, id]
+      [name, type, amount, accountId, categoryId, note, frequency, interval, startDate, endDate, active, now, id]
     );
 
     const updated = await this.get(id);

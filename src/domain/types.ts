@@ -127,6 +127,7 @@ export interface NewRecurringRule {
   interval?: number;
   startDate: DateOnly;
   endDate?: DateOnly | null;
+  active?: boolean;
 }
 
 export interface NewGoal {

@@ -163,3 +163,56 @@ export function generateDue(rule: RecurringRule, todayDate: DateOnly): DateOnly[
 
   return dueDates;
 }
+
+/**
+ * Calculates the next upcoming occurrence date strictly after fromDate.
+ * Returns null if rule is inactive or next occurrence exceeds endDate.
+ */
+export function nextOccurrence(rule: RecurringRule, fromDate: DateOnly): DateOnly | null {
+  if (!rule.active) return null;
+
+  if (rule.startDate > fromDate) {
+    if (rule.endDate && rule.startDate > rule.endDate) return null;
+    return rule.startDate;
+  }
+
+  const interval = Math.max(1, rule.interval || 1);
+  const [startYear, startMonth, startDay] = parseDateParts(rule.startDate);
+  const anchorDay = startDay;
+
+  let currentDate = rule.lastGeneratedDate ?? rule.startDate;
+  let safetyCounter = 0;
+
+  while (safetyCounter++ < 500) {
+    let nextDate: DateOnly;
+
+    if (rule.frequency === "daily") {
+      nextDate = advanceDays(currentDate, interval);
+    } else if (rule.frequency === "weekly") {
+      nextDate = advanceDays(currentDate, interval * 7);
+    } else if (rule.frequency === "monthly") {
+      const [cy, cm] = parseDateParts(currentDate);
+      const currentMonthOffset = (cy - startYear) * 12 + (cm - startMonth);
+      const nextMonthOffset = currentMonthOffset + interval;
+      nextDate = advanceMonths(startYear, startMonth, anchorDay, nextMonthOffset);
+    } else if (rule.frequency === "yearly") {
+      const [cy] = parseDateParts(currentDate);
+      const nextYearOffset = cy - startYear + interval;
+      nextDate = advanceYears(startYear, startMonth, anchorDay, nextYearOffset);
+    } else {
+      break;
+    }
+
+    if (rule.endDate && nextDate > rule.endDate) {
+      return null;
+    }
+
+    if (nextDate > fromDate) {
+      return nextDate;
+    }
+
+    currentDate = nextDate;
+  }
+
+  return null;
+}

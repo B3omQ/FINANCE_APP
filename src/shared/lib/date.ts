@@ -93,3 +93,42 @@ export function parseToDateOnly(input: string): DateOnly | null {
 
   return null;
 }
+
+/**
+ * Shifts a MonthKey ('YYYY-MM') by delta months.
+ * Example: shiftMonth('2026-10', -1) -> '2026-09'
+ */
+export function shiftMonth(month: MonthKey, delta: number): MonthKey {
+  const [yearStr, monthStr] = month.split("-");
+  const y = Number(yearStr) || 2026;
+  const m = Number(monthStr) || 1;
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  const newY = d.getUTCFullYear();
+  const newM = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${newY}-${newM}`;
+}
+
+/**
+ * Formats a MonthKey ('YYYY-MM') to Vietnamese display string (e.g. 'Tháng 10/2026').
+ */
+export function formatMonthYear(month: MonthKey): string {
+  const parts = month.split("-");
+  if (parts.length === 2) {
+    const [y, m] = parts;
+    return `Tháng ${Number(m)}/${y}`;
+  }
+  return month;
+}
+
+/**
+ * Returns an array of MonthKey strings for the last N months up to referenceMonth.
+ * Chronologically sorted (oldest to newest).
+ */
+export function getLastNMonths(count: number, referenceMonth?: MonthKey): MonthKey[] {
+  const current = referenceMonth ?? toMonthKey(today());
+  const result: MonthKey[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    result.push(shiftMonth(current, -i));
+  }
+  return result;
+}
