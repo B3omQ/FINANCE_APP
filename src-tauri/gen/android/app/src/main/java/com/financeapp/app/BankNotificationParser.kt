@@ -30,9 +30,15 @@ object BankNotificationParser {
     val PACKAGE_MAP = mapOf(
         // Techcombank
         "vn.com.techcombank.bb.app" to BankInfo("TCB", "Techcombank"),
+        "vn.com.techcombank.bb.corp.app" to BankInfo("TCB", "Techcombank Business"),
         "com.techcombank.bb.app" to BankInfo("TCB", "Techcombank"),
+        "com.techcombank.bb.corp.app" to BankInfo("TCB", "Techcombank Business"),
+        "vn.com.techcombank.epos" to BankInfo("TCB", "Techcombank T-Shop"),
         "com.fastacash.tcb" to BankInfo("TCB", "Techcombank"),
         "vn.techcombank.retail" to BankInfo("TCB", "Techcombank"),
+        "vn.techcombank" to BankInfo("TCB", "Techcombank"),
+        "vn.com.techcombank" to BankInfo("TCB", "Techcombank"),
+        "com.techcombank" to BankInfo("TCB", "Techcombank"),
 
         // MB Bank
         "com.mbmobile" to BankInfo("MB", "MB Bank"),
@@ -87,30 +93,59 @@ object BankNotificationParser {
         "com.bplus.vtpay" to BankInfo("VTPAY", "Viettel Money")
     )
 
-    // Regex to match amount formats requiring either sign [+-] or currency unit (VND/đ)
+    // Pattern to strip out balance information so it is never confused with the transaction amount
+    private val BALANCE_PATTERN = Pattern.compile(
+        """(?i)(?:số\s*dư|so\s*du|số\s*dư\s*khả\s*dụng|so\s*du\s*kha\s*dung)\s*:?\s*(?:VND|VNĐ|vnd|vnđ|đ|d)?\s*([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{4,12})\s*(?:VND|VNĐ|vnd|vnđ|đ|d)?"""
+    )
+
+    // Regex to match amount formats:
+    // 1) Sign [+-] followed by optional currency unit (VND/đ) and number (e.g. Techcombank: +VND 500,000, -VND 150,000, + VND 500,000)
+    // 2) Currency unit followed by sign [+-] and number (e.g. VND +500,000, VND -150,000)
+    // 3) Standard number followed by currency unit (e.g. MB/VCB: +500,000 VND, -150,000VND, 120.000đ)
     private val AMOUNT_PATTERN = Pattern.compile(
-        """(?:([+-])\s*([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{4,12})(?:\s*(?:VND|VNĐ|vnd|vnđ|đ|d))?|([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{4,12})\s*(?:VND|VNĐ|vnd|vnđ|đ|d))""",
+        """(?:([+-])\s*(?:VND|VNĐ|vnd|vnđ|đ|d)?\s*([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{4,12})|(?:VND|VNĐ|vnd|vnđ|đ|d)\s*([+-])\s*([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{4,12})|([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{4,12})\s*(?:VND|VNĐ|vnd|vnđ|đ|d))""",
         Pattern.CASE_INSENSITIVE
     )
 
-    // Regex to extract account number (e.g. "TK 0123...", "tai khoan 1903...")
+    // Regex to extract account number (e.g. "TK 0123...", "tai khoan 1903...", "Tai khoan thanh toan 1903...")
     private val ACCOUNT_PATTERN = Pattern.compile(
-        """(?:TK|Tài khoản|Tai khoan|Số TK|So TK)\s*:?\s*([0-9A-Za-z*]{3,16})""",
+        """\b(?:TK|Tài khoản|Tai khoan|Số TK|So TK|Thẻ|The)\s*(?:thanh toán|thanh toan|ghi nợ|tin dung|debit|credit)?\s*:?\s*([0-9A-Za-z*]{3,20})""",
         Pattern.CASE_INSENSITIVE
     )
 
-    // Regex to extract content/note (e.g. "ND: Cafe", "Noi dung: Mua sach", "tai Highlands")
-    private val NOTE_PATTERN = Pattern.compile(
-        """(?:ND|Nội dung|Noi dung|tại|tai|cho|ly do|lý do)\s*:?\s*([^|;\n\r]+)""",
+    // High-priority note pattern with word boundaries (avoids 'VND' matching loose 'ND')
+    private val NOTE_PRIORITY_PATTERN = Pattern.compile(
+        """\b(?:Nội dung|Noi dung|Lý do|Ly do|Ghi chú|Ghi chu|ND)\b\s*:?\s*([^|;\n\r.]+)""",
         Pattern.CASE_INSENSITIVE
     )
 
-    fun getBankInfo(packageName: String): BankInfo? {
-        return PACKAGE_MAP[packageName]
+    // Fallback note pattern for merchant / recipient locations
+    private val NOTE_FALLBACK_PATTERN = Pattern.compile(
+        """\b(?:tại|tai|cho|tới|to)\b\s*:?\s*(?!Techcombank|MB|Vietcombank|ACB|VPBank|BIDV)([^|;\n\r.]+)""",
+        Pattern.CASE_INSENSITIVE
+    )
+
+    fun getBankInfo(packageName: String, title: String = ""): BankInfo? {
+        val direct = PACKAGE_MAP[packageName]
+        if (direct != null) return direct
+
+        val lowerPkg = packageName.lowercase()
+        val lowerTitle = title.lowercase()
+        return when {
+            lowerPkg.contains("techcombank") || lowerPkg.contains("tcb") || lowerTitle.contains("techcombank") -> BankInfo("TCB", "Techcombank")
+            lowerPkg.contains("mbmobile") || lowerPkg.contains("mbbank") || lowerTitle.contains("mb bank") || lowerTitle.contains("mbbank") -> BankInfo("MB", "MB Bank")
+            lowerPkg.contains("vietcombank") || lowerPkg.contains("vcb") || lowerTitle.contains("vietcombank") -> BankInfo("VCB", "Vietcombank")
+            lowerPkg.contains("bidv") || lowerTitle.contains("bidv") -> BankInfo("BIDV", "BIDV SmartBanking")
+            lowerPkg.contains("vietinbank") || lowerPkg.contains("ipay") || lowerTitle.contains("vietinbank") -> BankInfo("CTG", "VietinBank iPay")
+            lowerPkg.contains("vpbank") || lowerTitle.contains("vpbank") -> BankInfo("VPB", "VPBank NEO")
+            lowerPkg.contains("tpbank") || lowerTitle.contains("tpbank") -> BankInfo("TPB", "TPBank")
+            lowerPkg.contains("acb") || lowerTitle.contains("acb") -> BankInfo("ACB", "ACB ONE")
+            else -> null
+        }
     }
 
-    fun isSupportedPackage(packageName: String): Boolean {
-        return PACKAGE_MAP.containsKey(packageName)
+    fun isSupportedPackage(packageName: String, title: String = ""): Boolean {
+        return getBankInfo(packageName, title) != null
     }
 
     fun parseWithDiagnostic(
@@ -121,7 +156,7 @@ object BankNotificationParser {
         bigText: String = "",
         timestamp: Long = System.currentTimeMillis()
     ): ParseResult {
-        val bank = PACKAGE_MAP[packageName]
+        val bank = getBankInfo(packageName, title)
             ?: return ParseResult.Ignored("Ứng dụng '$packageName' chưa nằm trong danh sách ngân hàng được hỗ trợ")
 
         val fullContent = listOf(title, text, subText, bigText)
@@ -138,14 +173,19 @@ object BankNotificationParser {
             return ParseResult.Ignored("Bỏ qua tin khuyến mãi / quảng cáo", bank.name)
         }
 
-        val matcher = AMOUNT_PATTERN.matcher(fullContent)
+        // Clean out account balance numbers first so they are never confused with transaction amounts
+        val contentWithoutBalance = BALANCE_PATTERN.matcher(fullContent).replaceAll("")
+
+        val matcher = AMOUNT_PATTERN.matcher(contentWithoutBalance)
         var matchedAmount = 0L
         var isExpense = true
         var foundAmount = false
 
         while (matcher.find()) {
-            val sign = matcher.group(1) ?: ""
-            val rawNum = (matcher.group(2) ?: matcher.group(3) ?: "").replace(".", "").replace(",", "")
+            val sign = matcher.group(1) ?: matcher.group(3) ?: ""
+            val rawNum = (matcher.group(2) ?: matcher.group(4) ?: matcher.group(5) ?: "")
+                .replace(".", "")
+                .replace(",", "")
             val parsedNum = rawNum.toLongOrNull() ?: 0L
 
             if (parsedNum >= 1000) {
@@ -157,7 +197,7 @@ object BankNotificationParser {
                 } else if (sign == "-") {
                     isExpense = true
                 } else {
-                    // Contextual check for MB, Techcombank, etc.
+                    // Contextual check for keywords
                     val isIncomeKeyword = lower.contains("cong tien") || lower.contains("cộng tiền") ||
                                           lower.contains("nhan duoc") || lower.contains("nhận được") ||
                                           lower.contains("hoan tien") || lower.contains("hoàn tiền") ||
@@ -176,7 +216,7 @@ object BankNotificationParser {
                                            lower.contains("chuyen khoan") || lower.contains("chuyển khoản") ||
                                            lower.contains("chuyen di") || lower.contains("chuyển đi") ||
                                            lower.contains("rut tien") || lower.contains("rút tiền") ||
-                                           lower.contains("phi duy tri") || lower.contains("phí")
+                                           lower.contains("phi") || lower.contains("phí")
 
                     if (isIncomeKeyword && !isExpenseKeyword) {
                         isExpense = false
@@ -196,9 +236,17 @@ object BankNotificationParser {
         val accMatcher = ACCOUNT_PATTERN.matcher(fullContent)
         val accountNumber = if (accMatcher.find()) accMatcher.group(1)?.trim() else null
 
-        // Extract note if present
-        val noteMatcher = NOTE_PATTERN.matcher(fullContent)
-        val note = if (noteMatcher.find()) noteMatcher.group(1)?.trim() else null
+        // Extract note if present (prioritize 'ND:', 'Noi dung:' over merchant fallback)
+        var note: String? = null
+        val noteMatcher = NOTE_PRIORITY_PATTERN.matcher(fullContent)
+        if (noteMatcher.find()) {
+            note = noteMatcher.group(1)?.trim()
+        } else {
+            val fallbackMatcher = NOTE_FALLBACK_PATTERN.matcher(fullContent)
+            if (fallbackMatcher.find()) {
+                note = fallbackMatcher.group(1)?.trim()
+            }
+        }
 
         val tx = ParsedBankTransaction(
             bankCode = bank.code,

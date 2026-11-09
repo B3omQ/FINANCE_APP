@@ -83,7 +83,7 @@ export interface ThemeState {
   setFontFamily: (font: FontFamily) => void;
   setCustomFinColors: (useCustom: boolean, incomeHex?: string, expenseHex?: string) => void;
   setBgSettings: (settings: Partial<BgSettings>) => void;
-  uploadAvatar: (blob: Blob) => Promise<void>;
+  uploadAvatar: (blobOrDataUrl: Blob | string) => Promise<void>;
   removeAvatar: () => Promise<void>;
   uploadBgImage: (blob: Blob) => Promise<void>;
   removeBgImage: () => Promise<void>;
@@ -106,6 +106,14 @@ function loadConfigFromStorage(): ThemeConfig {
     };
   } catch {
     return DEFAULT_THEME_CONFIG;
+  }
+}
+
+function getInitialAvatarUrl(): string | null {
+  try {
+    return localStorage.getItem('finance_app_avatar_data');
+  } catch {
+    return null;
   }
 }
 
@@ -137,18 +145,18 @@ function getFontStack(fontFamily: FontFamily): string {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  config: DEFAULT_THEME_CONFIG,
-  avatarUrl: null,
+  config: loadConfigFromStorage(),
+  avatarUrl: getInitialAvatarUrl(),
   bgImageUrl: null,
   isInitialized: false,
 
   initTheme: async () => {
     const config = loadConfigFromStorage();
 
-    let avatarUrl: string | null = null;
+    let avatarUrl: string | null = getInitialAvatarUrl();
     let bgImageUrl: string | null = null;
 
-    if (config.hasAvatar) {
+    if (config.hasAvatar && !avatarUrl) {
       avatarUrl = await getMediaAssetUrl('user_avatar');
     }
 
@@ -242,23 +250,48 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     get().applyToDOM();
   },
 
-  uploadAvatar: async (blob: Blob) => {
-    await saveMediaAsset('user_avatar', blob);
-    const prevUrl = get().avatarUrl;
-    if (prevUrl) URL.revokeObjectURL(prevUrl);
+  uploadAvatar: async (blobOrDataUrl: Blob | string) => {
+    let finalUrl: string;
+    if (typeof blobOrDataUrl === 'string') {
+      finalUrl = blobOrDataUrl;
+      await saveMediaAsset('user_avatar', finalUrl);
+    } else {
+      // If it's a Blob, convert to Data URL so it is immune to Android WebView Blob cloning issues
+      finalUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read blob'));
+        reader.readAsDataURL(blobOrDataUrl);
+      });
+      await saveMediaAsset('user_avatar', finalUrl);
+    }
 
-    const newUrl = URL.createObjectURL(blob);
+    const prevUrl = get().avatarUrl;
+    if (prevUrl && prevUrl.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(prevUrl);
+      } catch {
+        // Ignore
+      }
+    }
+
     set((state) => {
       const updated = { ...state.config, hasAvatar: true };
       saveConfigToStorage(updated);
-      return { config: updated, avatarUrl: newUrl };
+      return { config: updated, avatarUrl: finalUrl };
     });
   },
 
   removeAvatar: async () => {
     await deleteMediaAsset('user_avatar');
     const prevUrl = get().avatarUrl;
-    if (prevUrl) URL.revokeObjectURL(prevUrl);
+    if (prevUrl && prevUrl.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(prevUrl);
+      } catch {
+        // Ignore
+      }
+    }
 
     set((state) => {
       const updated = { ...state.config, hasAvatar: false };

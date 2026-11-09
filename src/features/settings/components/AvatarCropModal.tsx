@@ -1,23 +1,25 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Modal } from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/Button';
-import { cropAndResizeAvatar, CropArea } from '../../../shared/lib/imageProcessing';
+import { cropAndResizeAvatarToDataUrl, CropArea } from '../../../shared/lib/imageProcessing';
 import { ZoomIn, ZoomOut, RotateCcw, Check } from 'lucide-react';
 
 interface AvatarCropModalProps {
   isOpen: boolean;
   onClose: () => void;
-  imageFile: File | null;
-  onConfirm: (croppedBlob: Blob) => Promise<void>;
+  imageFile?: File | null;
+  imageSrc?: string | null;
+  onConfirm: (croppedDataUrl: string) => Promise<void>;
 }
 
 export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
   isOpen,
   onClose,
   imageFile,
+  imageSrc,
   onConfirm,
 }) => {
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [activeSrc, setActiveSrc] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(1);
   const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -73,35 +75,66 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
     ctx.restore();
   }, [zoom, offset]);
 
-  // Load image when file changes
+  // Load image when file or imageSrc changes - using Data URL to prevent Android WebView revocation issues
   useEffect(() => {
-    if (!imageFile) {
-      setImageSrc(null);
+    let isCancelled = false;
+
+    if (imageSrc) {
+      setActiveSrc(imageSrc);
+      setZoom(1);
+      setOffset({ x: 0, y: 0 });
       setIsImageReady(false);
-      imgRef.current = null;
-      return;
+
+      const img = new Image();
+      img.onload = () => {
+        if (!isCancelled) {
+          imgRef.current = img;
+          setIsImageReady(true);
+        }
+      };
+      img.onerror = () => {
+        console.error('Failed to load image in AvatarCropModal');
+        if (!isCancelled) setIsImageReady(false);
+      };
+      img.src = imageSrc;
+      return () => {
+        isCancelled = true;
+      };
     }
-    const url = URL.createObjectURL(imageFile);
-    setImageSrc(url);
-    setZoom(1);
-    setOffset({ x: 0, y: 0 });
-    setIsImageReady(false);
 
-    const img = new Image();
-    img.src = url;
-    img.onload = () => {
-      imgRef.current = img;
-      setIsImageReady(true);
-    };
-    img.onerror = () => {
-      console.error('Failed to load image in AvatarCropModal');
+    if (imageFile) {
+      setZoom(1);
+      setOffset({ x: 0, y: 0 });
       setIsImageReady(false);
-    };
 
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-  }, [imageFile]);
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (isCancelled) return;
+        const result = reader.result as string;
+        setActiveSrc(result);
+        const img = new Image();
+        img.onload = () => {
+          if (!isCancelled) {
+            imgRef.current = img;
+            setIsImageReady(true);
+          }
+        };
+        img.onerror = () => {
+          console.error('Failed to load image in AvatarCropModal');
+          if (!isCancelled) setIsImageReady(false);
+        };
+        img.src = result;
+      };
+      reader.readAsDataURL(imageFile);
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    setActiveSrc(null);
+    setIsImageReady(false);
+    imgRef.current = null;
+  }, [imageFile, imageSrc]);
 
   useEffect(() => {
     if (isImageReady) {
@@ -193,8 +226,8 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
         height: Math.round(naturalCropDim),
       };
 
-      const croppedBlob = await cropAndResizeAvatar(img, cropArea);
-      await onConfirm(croppedBlob);
+      const croppedDataUrl = cropAndResizeAvatarToDataUrl(img, cropArea, 256);
+      await onConfirm(croppedDataUrl);
       onClose();
     } catch (err) {
       console.error('Lỗi khi cắt ảnh đại diện:', err);
@@ -203,7 +236,7 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
     }
   };
 
-  if (!isOpen || !imageSrc) return null;
+  if (!isOpen || !activeSrc) return null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Cắt ảnh đại diện">

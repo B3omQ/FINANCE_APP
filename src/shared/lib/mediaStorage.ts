@@ -7,6 +7,7 @@
 const DB_NAME = 'finance_app_media_db';
 const DB_VERSION = 1;
 const STORE_NAME = 'assets';
+const AVATAR_LOCALSTORAGE_KEY = 'finance_app_avatar_data';
 
 export type MediaAssetKey = 'user_avatar' | 'user_background';
 
@@ -37,14 +38,22 @@ function openDatabase(): Promise<IDBDatabase> {
 }
 
 /**
- * Save a binary blob into IndexedDB
+ * Save a binary blob or data URL string into IndexedDB (and localStorage fallback for avatar)
  */
-export async function saveMediaAsset(key: MediaAssetKey, blob: Blob): Promise<void> {
+export async function saveMediaAsset(key: MediaAssetKey, data: Blob | string): Promise<void> {
+  if (key === 'user_avatar' && typeof data === 'string') {
+    try {
+      localStorage.setItem(AVATAR_LOCALSTORAGE_KEY, data);
+    } catch (e) {
+      console.warn('Failed to cache avatar in localStorage, will rely on IndexedDB:', e);
+    }
+  }
+
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    const request = store.put(blob, key);
+    const request = store.put(data, key);
 
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error || new Error(`Failed to save media asset: ${key}`));
@@ -52,9 +61,19 @@ export async function saveMediaAsset(key: MediaAssetKey, blob: Blob): Promise<vo
 }
 
 /**
- * Retrieve a binary blob from IndexedDB
+ * Retrieve a binary blob or data URL string from IndexedDB
  */
-export async function getMediaAsset(key: MediaAssetKey): Promise<Blob | null> {
+export async function getMediaAsset(key: MediaAssetKey): Promise<Blob | string | null> {
+  // Synchronous fast-path for avatar cached in localStorage
+  if (key === 'user_avatar') {
+    try {
+      const cached = localStorage.getItem(AVATAR_LOCALSTORAGE_KEY);
+      if (cached) return cached;
+    } catch {
+      // Ignore localStorage errors
+    }
+  }
+
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
@@ -63,20 +82,32 @@ export async function getMediaAsset(key: MediaAssetKey): Promise<Blob | null> {
 
     request.onsuccess = () => {
       const result = request.result;
-      resolve(result instanceof Blob ? result : null);
+      if (result instanceof Blob || typeof result === 'string') {
+        if (key === 'user_avatar' && typeof result === 'string') {
+          try {
+            localStorage.setItem(AVATAR_LOCALSTORAGE_KEY, result);
+          } catch {
+            // Ignore quota issues
+          }
+        }
+        resolve(result);
+      } else {
+        resolve(null);
+      }
     };
     request.onerror = () => reject(request.error || new Error(`Failed to get media asset: ${key}`));
   });
 }
 
 /**
- * Create an object URL from the stored Blob, or null if not found
+ * Create an accessible URL (Data URL or Object URL) from stored asset, or null if not found
  */
 export async function getMediaAssetUrl(key: MediaAssetKey): Promise<string | null> {
   try {
-    const blob = await getMediaAsset(key);
-    if (!blob) return null;
-    return URL.createObjectURL(blob);
+    const asset = await getMediaAsset(key);
+    if (!asset) return null;
+    if (typeof asset === 'string') return asset;
+    return URL.createObjectURL(asset);
   } catch (err) {
     console.error(`Error loading media asset url for ${key}:`, err);
     return null;
@@ -84,9 +115,17 @@ export async function getMediaAssetUrl(key: MediaAssetKey): Promise<string | nul
 }
 
 /**
- * Delete a media asset from IndexedDB
+ * Delete a media asset from IndexedDB and localStorage
  */
 export async function deleteMediaAsset(key: MediaAssetKey): Promise<void> {
+  if (key === 'user_avatar') {
+    try {
+      localStorage.removeItem(AVATAR_LOCALSTORAGE_KEY);
+    } catch {
+      // Ignore
+    }
+  }
+
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');

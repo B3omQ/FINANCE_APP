@@ -17,7 +17,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const { config, avatarUrl, setUserName, uploadAvatar, removeAvatar } = useThemeStore();
   const [name, setName] = useState(config.userName || '');
   const [isSaved, setIsSaved] = useState(false);
-  const [selectedCropFile, setSelectedCropFile] = useState<File | null>(null);
+  const [selectedCropSrc, setSelectedCropSrc] = useState<string | null>(null);
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -59,16 +59,22 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
       return;
     }
 
-    setSelectedCropFile(file);
-    setIsCropModalOpen(true);
-    e.target.value = '';
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedCropSrc(reader.result as string);
+      setIsCropModalOpen(true);
+    };
+    reader.onerror = () => {
+      setErrorMessage('Không thể đọc dữ liệu ảnh từ thiết bị');
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleCropConfirm = async (croppedBlob: Blob) => {
+  const handleCropConfirm = async (croppedDataUrl: string) => {
     try {
-      await uploadAvatar(croppedBlob);
+      await uploadAvatar(croppedDataUrl);
       setIsCropModalOpen(false);
-      setSelectedCropFile(null);
+      setSelectedCropSrc(null);
     } catch (err) {
       console.error(err);
       setErrorMessage('Không thể cập nhật ảnh đại diện');
@@ -108,10 +114,18 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
           {/* Avatar Section */}
           <div className="flex flex-col items-center justify-center gap-3">
             <div className="relative group">
-              <label
-                htmlFor="user-profile-avatar-input"
+              <div
+                onClick={() => fileInputRef.current?.click()}
                 className="w-24 h-24 rounded-full overflow-hidden border-3 border-primary/70 shadow-lg flex items-center justify-center bg-card cursor-pointer block relative group-hover:border-primary transition-all active:scale-95"
                 title="Nhấn để chọn ảnh mới từ thư viện"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
               >
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
@@ -126,35 +140,40 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   <Camera size={20} />
                   <span>Đổi ảnh</span>
                 </div>
-              </label>
+              </div>
 
               {/* Camera Badge always visible for easy tapping on mobile */}
-              <label
-                htmlFor="user-profile-avatar-input"
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
                 className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md border-2 border-card cursor-pointer active:scale-90 transition-transform"
                 title="Chọn ảnh từ thiết bị"
               >
                 <Camera size={13} />
-              </label>
+              </button>
             </div>
 
-            {/* Native file input - off-screen instead of display:none to guarantee Android WebView compatibility */}
+            {/* Native file input - accessible sr-only to guarantee Android WebView compatibility */}
             <input
               id="user-profile-avatar-input"
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              onClick={(e) => {
+                (e.target as HTMLInputElement).value = '';
+              }}
               onChange={handleAvatarFileSelect}
-              className="opacity-0 pointer-events-none absolute -z-10 w-px h-px overflow-hidden"
+              className="sr-only"
             />
 
             <div className="flex items-center gap-2">
-              <label
-                htmlFor="user-profile-avatar-input"
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
                 className="cursor-pointer inline-flex items-center justify-center gap-1.5 text-xs py-2 px-3.5 rounded-xl border border-border/70 hover:bg-muted font-medium bg-secondary/50 text-foreground active:scale-95 transition-all shadow-sm"
               >
                 <Upload size={13} /> <span>{avatarUrl ? 'Đổi ảnh' : 'Tải ảnh lên'}</span>
-              </label>
+              </button>
 
               {avatarUrl && (
                 <Button
@@ -228,9 +247,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
         isOpen={isCropModalOpen}
         onClose={() => {
           setIsCropModalOpen(false);
-          setSelectedCropFile(null);
+          setSelectedCropSrc(null);
         }}
-        imageFile={selectedCropFile}
+        imageSrc={selectedCropSrc}
         onConfirm={handleCropConfirm}
       />
     </>

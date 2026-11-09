@@ -112,16 +112,32 @@ export function useBankNotifications() {
   };
 
   const addMockTransaction = async (
-    bankName = 'Vietcombank',
+    bankName = 'Techcombank',
     amount = 55000,
     type: 'expense' | 'income' = 'expense',
     content = 'Highlands Coffee'
   ) => {
     try {
+      const code = bankName.toLowerCase().includes('tech')
+        ? 'TCB'
+        : bankName.toLowerCase().includes('mb')
+          ? 'MB'
+          : 'VCB';
+      const pkg =
+        code === 'TCB'
+          ? 'vn.com.techcombank.bb.app'
+          : code === 'MB'
+            ? 'com.mbmobile'
+            : 'com.VCB';
+      const rawText =
+        code === 'TCB'
+          ? `TK 19033388888888 tai Techcombank ${type === 'expense' ? '-VND' : '+VND'} ${amount.toLocaleString()} luc 14:30. So du: VND 1,500,000. Noi dung: ${content}`
+          : `GD: ${type === 'expense' ? '-' : '+'}${amount.toLocaleString()} VND. ND: ${content}`;
+
       if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('add_mock_bank_transaction', {
-          bankCode: 'VCB',
+          bankCode: code,
           bankName,
           amount,
           txType: type,
@@ -130,16 +146,16 @@ export function useBankNotifications() {
       } else {
         const mockItem: PendingBankTransaction = {
           id: `mock-${Date.now()}`,
-          bankCode: 'VCB',
+          bankCode: code,
           bankName,
           amount,
           type,
-          accountNumber: '1012***',
+          accountNumber: '1903***',
           content,
           timestamp: Date.now(),
           rawTitle: `Biến động số dư ${bankName}`,
-          rawText: `GD: ${type === 'expense' ? '-' : '+'}${amount.toLocaleString()} VND. ND: ${content}`,
-          packageName: 'com.VCB',
+          rawText,
+          packageName: pkg,
           status: 'pending',
         };
         const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');

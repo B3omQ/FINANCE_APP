@@ -140,6 +140,45 @@ export async function cropAndResizeAvatar(
 }
 
 /**
+ * Crop an image area and return a compact Base64 Data URL (JPEG/WebP)
+ * This avoids Blob URL revocation issues and IndexedDB serialization bugs in mobile WebViews.
+ */
+export function cropAndResizeAvatarToDataUrl(
+  imageSource: HTMLImageElement,
+  cropArea: CropArea,
+  targetDimension = MAX_AVATAR_DIMENSION
+): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = targetDimension;
+  canvas.height = targetDimension;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Không thể khởi tạo Canvas 2D context');
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  ctx.drawImage(
+    imageSource,
+    cropArea.x,
+    cropArea.y,
+    cropArea.width,
+    cropArea.height,
+    0,
+    0,
+    targetDimension,
+    targetDimension
+  );
+
+  // JPEG 0.85 generates ~15-20KB base64 string, perfect for instant offline storage
+  try {
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } catch {
+    return canvas.toDataURL('image/png');
+  }
+}
+
+/**
  * Resize a background image to max 1920px width/height maintaining aspect ratio.
  */
 export async function resizeBackgroundImage(file: File): Promise<Blob> {

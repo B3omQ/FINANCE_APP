@@ -1,4 +1,4 @@
-# 🪙 Finance App (Finance Vault)
+9# 🪙 Finance App (Finance Vault)
 
 > **Ứng dụng quản lý tài chính cá nhân đa nền tảng (Desktop & Android) hoạt động hoàn toàn cục bộ (100% Offline-First), bảo mật tối đa, không cần tài khoản, không theo dõi và không lưu trữ dữ liệu lên máy chủ đám mây.**
 

@@ -29,7 +29,7 @@ class BankNotificationListenerService : NotificationListenerService() {
         val timestamp = sbn.postTime
 
         val fullText = "$title $text $subText $bigText".lowercase()
-        val isSupported = BankNotificationParser.isSupportedPackage(packageName)
+        val isSupported = BankNotificationParser.isSupportedPackage(packageName, title)
 
         // Check if message looks like finance/money
         val looksLikeMoney = fullText.contains("vnd") || fullText.contains("vnđ") ||
@@ -56,7 +56,7 @@ class BankNotificationListenerService : NotificationListenerService() {
             return
         }
 
-        val bankInfo = BankNotificationParser.getBankInfo(packageName)
+        val bankInfo = BankNotificationParser.getBankInfo(packageName, title)
 
         when (val result = BankNotificationParser.parseWithDiagnostic(packageName, title, text, subText, bigText, timestamp)) {
             is ParseResult.Success -> {

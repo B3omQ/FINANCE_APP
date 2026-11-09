@@ -45,7 +45,7 @@ export const AppearanceSettingsPage: React.FC = () => {
 
   const [userNameInput, setUserNameInput] = useState(config.userName || '');
   const [userNameSaved, setUserNameSaved] = useState(false);
-  const [selectedCropFile, setSelectedCropFile] = useState<File | null>(null);
+  const [selectedCropSrc, setSelectedCropSrc] = useState<string | null>(null);
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isUploadingBg, setIsUploadingBg] = useState(false);
@@ -83,9 +83,15 @@ export const AppearanceSettingsPage: React.FC = () => {
       return;
     }
 
-    setSelectedCropFile(file);
-    setIsCropModalOpen(true);
-    e.target.value = ''; // Reset input
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedCropSrc(reader.result as string);
+      setIsCropModalOpen(true);
+    };
+    reader.onerror = () => {
+      setErrorMessage('Không thể đọc tệp ảnh từ thiết bị');
+    };
+    reader.readAsDataURL(file);
   };
 
   // Handle background image file selection
@@ -439,16 +445,25 @@ export const AppearanceSettingsPage: React.FC = () => {
             {/* Sub-item: Avatar Upload */}
             <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 flex flex-col sm:flex-row items-center gap-4">
               <div className="relative group shrink-0">
-                <label
-                  htmlFor="settings-avatar-file-input"
+                <div
+                  onClick={() => avatarInputRef.current?.click()}
                   className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary shadow-md flex items-center justify-center bg-card cursor-pointer block active:scale-95 transition-transform"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      avatarInputRef.current?.click();
+                    }
+                  }}
+                  title="Chọn ảnh đại diện"
                 >
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
                     <User className="w-7 h-7 text-muted-foreground" />
                   )}
-                </label>
+                </div>
               </div>
 
               <div className="flex-1 text-center sm:text-left space-y-1">
@@ -463,15 +478,19 @@ export const AppearanceSettingsPage: React.FC = () => {
                     ref={avatarInputRef}
                     type="file"
                     accept="image/*"
+                    onClick={(e) => {
+                      (e.target as HTMLInputElement).value = '';
+                    }}
                     onChange={handleAvatarSelect}
-                    className="opacity-0 pointer-events-none absolute -z-10 w-px h-px overflow-hidden"
+                    className="sr-only"
                   />
-                  <label
-                    htmlFor="settings-avatar-file-input"
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
                     className="cursor-pointer inline-flex items-center justify-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-border/70 hover:bg-muted font-medium bg-card text-foreground active:scale-95 transition-all shadow-sm"
                   >
                     <Upload className="w-3 h-3" /> {avatarUrl ? 'Thay đổi ảnh' : 'Tải ảnh lên'}
-                  </label>
+                  </button>
                   {avatarUrl && (
                     <Button
                       type="button"
@@ -503,17 +522,22 @@ export const AppearanceSettingsPage: React.FC = () => {
                     ref={bgInputRef}
                     type="file"
                     accept="image/*"
+                    onClick={(e) => {
+                      (e.target as HTMLInputElement).value = '';
+                    }}
                     onChange={handleBgSelect}
-                    className="opacity-0 pointer-events-none absolute -z-10 w-px h-px overflow-hidden"
+                    className="sr-only"
                   />
-                  <label
-                    htmlFor="settings-bg-file-input"
+                  <button
+                    type="button"
+                    onClick={() => bgInputRef.current?.click()}
+                    disabled={isUploadingBg}
                     className={`cursor-pointer inline-flex items-center justify-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-border/70 hover:bg-muted font-medium bg-card text-foreground active:scale-95 transition-all shadow-sm ${
                       isUploadingBg ? 'opacity-50 pointer-events-none' : ''
                     }`}
                   >
                     <Upload className="w-3 h-3" /> {isUploadingBg ? 'Đang nén...' : bgImageUrl ? 'Đổi hình nền' : 'Chọn hình nền'}
-                  </label>
+                  </button>
                   {bgImageUrl && (
                     <Button
                       type="button"
@@ -680,11 +704,11 @@ export const AppearanceSettingsPage: React.FC = () => {
         isOpen={isCropModalOpen}
         onClose={() => {
           setIsCropModalOpen(false);
-          setSelectedCropFile(null);
+          setSelectedCropSrc(null);
         }}
-        imageFile={selectedCropFile}
-        onConfirm={async (croppedBlob) => {
-          await uploadAvatar(croppedBlob);
+        imageSrc={selectedCropSrc}
+        onConfirm={async (croppedDataUrl) => {
+          await uploadAvatar(croppedDataUrl);
         }}
       />
 
